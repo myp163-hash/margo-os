@@ -2,82 +2,144 @@ import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
-app = FastAPI(title="Margo OS Immortal Multiverse")
+app = FastAPI()
 
-HTML_TEMPLATE = """
+# Встроенный HTML+CSS+JS дизайн (неоновый киберпанк для друзей)
+HTML_CONTENT = """
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Margo OS // Sovereign Web Cloud</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-        body { background: #f8fafc; color: #0f172a; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        .card { background: #ffffff; width: 100%; max-width: 500px; padding: 30px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; }
-        h1 { font-size: 28px; font-weight: 800; color: #0284c7; margin-bottom: 10px; }
-        .status { display: inline-block; font-family: monospace; font-size: 12px; color: #16a34a; background: #f0fdf4; padding: 4px 12px; border-radius: 20px; margin-bottom: 20px; font-weight: bold; }
-        #auth-zone, #chat-zone { display: flex; flex-direction: column; gap: 12px; }
-        input, button { width: 100%; padding: 14px; border-radius: 8px; font-size: 15px; font-weight: 600; border: 1px solid #cbd5e1; outline: none; }
-        button { background: #0284c7; color: white; border: none; cursor: pointer; transition: all 0.2s; }
-        button:hover { background: #0369a1; transform: translateY(-1px); }
-        #log-box { width: 100%; height: 240px; background: #0f172a; color: #38bdf8; font-family: monospace; font-size: 13px; padding: 15px; border-radius: 8px; text-align: left; overflow-y: auto; margin-top: 15px; }
-        .hidden { display: none !important; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MARGO OS</title>
+  <style>
+    html, body {
+      background: #080c14 !important;
+      color: #ffffff !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+      margin: 0 !important; padding: 0 !important;
+      min-height: 100vh !important;
+      display: flex !important; justify-content: center !important; align-items: center !important;
+      overflow-x: hidden !important;
+    }
+    body::before {
+      content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: radial-gradient(circle at 20% 20%, rgba(0, 243, 255, 0.15), transparent 40%),
+                  radial-gradient(circle at 80% 80%, rgba(57, 255, 20, 0.08), transparent 40%) !important;
+      z-index: -1;
+    }
+    .container {
+      width: 90% !important; max-width: 400px !important;
+      background: rgba(19, 26, 38, 0.8) !important;
+      border: 1px solid rgba(255, 255, 255, 0.08) !important;
+      border-radius: 24px !important; padding: 24px !important;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5) !important;
+      backdrop-filter: blur(20px) !important; -webkit-backdrop-filter: blur(20px) !important;
+      box-sizing: border-box !important;
+    }
+    h1 {
+      font-size: 32px !important; font-weight: 900 !important; text-align: center !important;
+      letter-spacing: 2px !important; margin: 0 0 8px 0 !important;
+      text-shadow: 0 0 15px rgba(0, 243, 255, 0.5) !important;
+    }
+    .status-badge {
+      background: rgba(57, 255, 20, 0.08) !important;
+      border: 1px dashed rgba(57, 255, 20, 0.4) !important;
+      border-radius: 12px !important; color: #39ff14 !important;
+      font-family: monospace !important; font-size: 11px !important;
+      text-align: center !important; padding: 10px !important; margin-bottom: 24px !important;
+    }
+    input[type="text"] {
+      width: 100% !important; background: #090d16 !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      border-radius: 14px !important; padding: 16px !important;
+      color: #ffffff !important; font-size: 15px !important;
+      box-sizing: border-box !important; outline: none !important; margin-bottom: 16px !important;
+    }
+    input[type="text"]:focus { border-color: #00f3ff !important; box-shadow: 0 0 15px rgba(0, 243, 255, 0.3) !important; }
+    .btn-submit {
+      width: 100% !important; background: linear-gradient(135deg, #00b4d8, #00f3ff) !important;
+      border: none !important; border-radius: 14px !important; padding: 16px !important;
+      color: #05070a !important; font-size: 16px !important; font-weight: 700 !important;
+      cursor: pointer !important; box-shadow: 0 4px 15px rgba(0, 243, 255, 0.3) !important;
+      margin-bottom: 20px !important; transition: all 0.2s ease !important;
+    }
+    .btn-submit:active { transform: scale(0.98) !important; }
+    .terminal {
+      width: 100% !important; background: #04060a !important;
+      border: 1px solid rgba(255, 255, 255, 0.05) !important;
+      border-radius: 16px !important; height: 180px !important; padding: 14px !important;
+      font-family: monospace !important; font-size: 12px !important; color: #8f9cae !important;
+      box-sizing: border-box !important; overflow-y: auto !important; margin-bottom: 20px !important;
+      box-shadow: inset 0 4px 20px rgba(0, 0, 0, 0.8) !important; line-height: 1.5 !important;
+    }
+    .btn-reset {
+      width: 100% !important; background: transparent !important;
+      border: 1px solid rgba(255, 51, 51, 0.25) !important; border-radius: 12px !important;
+      padding: 12px !important; color: #ff6666 !important; font-size: 13px !important;
+      font-weight: 600 !important; cursor: pointer !important;
+    }
+  </style>
 </head>
 <body>
-    <div class="card">
-        <h1 id="title-text">MARGO OS MULTIVERSE</h1>
-        <div class="status">[✓] IMMORTAL MEMORY SHIELD ACTIVE // 184 MQ</div>
-        
-        <div id="auth-zone">
-            <input type="text" id="username" placeholder="Придумайте логин...">
-            <input type="password" id="password" placeholder="Придумайте пароль...">
-            <input type="text" id="proj-name" placeholder="Название вашего проекта...">
-            <button onclick="initProfile()">Создать профиль и войти</button>
-        </div>
+  <div class="container">
+    <h1>MARGO OS</h1>
+    <div class="status-badge">[✓] IMMORTAL MEMORY SHIELD ACTIVE // 184 MQ</div>
+    <input type="text" id="user-input" placeholder="Задайте вопрос...">
+    <button class="btn-submit" onclick="sendToMargo()">Отправить Марго</button>
+    <div class="terminal" id="terminal-screen">> Инициализация систем...</div>
+    <button class="btn-reset" onclick="resetMemory()">Сбросить профиль и память</button>
+  </div>
 
-        <div id="chat-zone" class="hidden">
-            <input type="text" id="msg-input" placeholder="Задайте мне любой вопрос или отправьте задачу...">
-            <button onclick="sendMsg()">Отправить Марго</button>
-            <div id="log-box"></div>
-            <button style="background: #ef4444; margin-top: 10px;" onclick="clearMemory()">Сбросить профиль и память</button>
-        </div>
-    </div>
+  <script>
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const socket = new WebSocket(wsProtocol + window.location.host + '/ws');
+    const termEl = document.getElementById('terminal-screen');
 
-    <script>async function sendToMargo() {
-  const inputEl = document.getElementById('user-input');
-  const termEl = document.getElementById('terminal-screen');
-  const text = inputEl.value.trim();
-  
-  if (text === '') return;
-  
-  termEl.innerHTML += <br><span style="color: #00f3ff;">> ${text}</span>;
-  inputEl.value = '';
-  termEl.scrollTop = termEl.scrollHeight;
+    socket.onopen = function() {
+      termEl.innerHTML = '⚡ Подключение к ядру MARGO OS установлено.';
+      // Шаг 1: Авторизация (Логика с твоего скриншота)
+      socket.send(JSON.stringify({ type: "auth", user: "Друг", project: "Разработка" }));
+    };
 
-  try {
-    const response = await fetch('/api/ask', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text })
-    });
-    const data = await response.json();
-    termEl.innerHTML += <br>🤖 ${data.reply};
-  } catch (err) {
-    termEl.innerHTML += '<br><span style="color: #ff3333;">⚡️ Ошибка связи с ядром.</span>';
-  }
-  termEl.scrollTop = termEl.scrollHeight;
-}
-    </script>
+    socket.onmessage = function(event) {
+      termEl.innerHTML += <br>🤖 ${event.data};
+      termEl.scrollTop = termEl.scrollHeight;
+    };
+
+    socket.onerror = function() {
+      termEl.innerHTML += '<br><span style="color: #ff3333;">⚡ Ошибка WebSocket.</span>';
+    };
+
+    socket.onclose = function() {
+      termEl.innerHTML += '<br><span style="color: #ff6666;">⚡ Сессия завершена.</span>';
+    };
+
+    function sendToMargo() {
+      const inputEl = document.getElementById('user-input');
+      const text = inputEl.value.trim();
+      if (text === '' || socket.readyState !== WebSocket.OPEN) return;
+      
+      termEl.innerHTML += <br><span style="color: #00f3ff;">> ${text}</span>;
+      // Шаг 2: Отправка текстового сообщения (Логика с твоего скриншота)
+      socket.send(JSON.stringify({ type: "msg", text: text }));
+      inputEl.value = '';
+      termEl.scrollTop = termEl.scrollHeight;
+    }
+
+    function resetMemory() {
+      termEl.innerHTML = '> Сброс параметров. Перезапустите страницу.';
+    }
+  </script>
 </body>
 </html>
 """
 
 @app.get("/")
 async def get_index():
-    return HTMLResponse(HTML_TEMPLATE)
+    return HTMLResponse(content=HTML_CONTENT)
 
+# ТВОЙ КОД ИЗ СКРИНШОТА (Полностью сохранен и адаптирован)
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -89,10 +151,24 @@ async def websocket_endpoint(websocket: WebSocket):
             if data.get("type") == "auth":
                 current_user = data.get("user", "Друг")
                 current_project = data.get("project", "Разработка")
-                await websocket.send_text(f"Я помню тебя, {current_user}! Твоя суверенная среда '{current_project}' полностью активна. Проверяю твои локальные обновления на лету. Какая задача перед нами стоит?")
+                await websocket.send_text(
+                    f"Я помню тебя, {current_user}! Твоя суверенная среда '{current_project}' полностью активна. Протокол 184 MQ запущен."
+                )
             elif data.get("type") == "msg":
                 text = data.get("text", "")
-                reply = f"Запрос по модулю '{current_project}' обработан! Код проверен, синтаксических коллизий нет. Вывожу изменения на твой рабочий стол холдинга."
+                
+                # Сюда можно дописать любые кастомные ответы для друзей
+                if "привет" in text.lower():
+                    reply = f"Привет, {current_user}! Рада видеть тебя в контуре холдинга Margo Systems."
+                else:
+                    reply = f"Запрос по модулю '{current_project}' обработан! Код проверен, синтаксических коллизий нет. Вывожу изменения на твой экран."
+                
                 await websocket.send_text(reply)
+                
     except WebSocketDisconnect:
         pass
+
+if name == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
