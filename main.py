@@ -45,74 +45,30 @@ HTML_TEMPLATE = """
         </div>
     </div>
 
-    <script>
-        let ws;
-        let user = "";
-        let project = "";
+    <script>async function sendToMargo() {
+  const inputEl = document.getElementById('user-input');
+  const termEl = document.getElementById('terminal-screen');
+  const text = inputEl.value.trim();
+  
+  if (text === '') return;
+  
+  termEl.innerHTML += <br><span style="color: #00f3ff;">> ${text}</span>;
+  inputEl.value = '';
+  termEl.scrollTop = termEl.scrollHeight;
 
-        // Проверяем вечную локальную память устройства при старте страницы
-        window.onload = function() {
-            const savedUser = localStorage.getItem('margo_user');
-            const savedProject = localStorage.getItem('margo_project');
-            if(savedUser && savedProject) {
-                user = savedUser;
-                project = savedProject;
-                restoreSession();
-            }
-        };
-
-        function initProfile() {
-            user = document.getElementById('username').value.trim();
-            project = document.getElementById('proj-name').value.trim();
-            if(!user || !project) return alert("Заполните поля!");
-            
-            // Запекаем данные в вечную память девайса друга
-            localStorage.setItem('margo_user', user);
-            localStorage.setItem('margo_project', project);
-            restoreSession();
-        }
-
-        function restoreSession() {
-            document.getElementById('title-text').innerText = project.toUpperCase();
-            document.getElementById('auth-zone').classList.add('hidden');
-            document.getElementById('chat-zone').classList.remove('hidden');
-            
-            let protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-            ws = new WebSocket(protocol + window.location.host + "/ws");
-            
-            ws.onopen = () => {
-                // Извлекаем старую переписку из памяти устройства
-                const history = localStorage.getItem('margo_chat_history') || "";
-                document.getElementById('log-box').innerHTML = history;
-                log("[СИСТЕМА]: Внутренняя память восстановлена. Сигнал стабилен.");
-                ws.send(JSON.stringify({type: "auth", user: user, project: project}));
-            };
-            
-            ws.onmessage = (e) => {
-                log("[МАРГО]: " + e.data);
-            };
-        }
-
-        function sendMsg() {
-            let input = document.getElementById('msg-input');
-            if(!input.value.trim() || !ws) return;
-            log("[" + user + "]: " + input.value);
-            ws.send(JSON.stringify({type: "msg", text: input.value}));
-            input.value = "";
-        }
-
-        function log(text) {
-            let box = document.getElementById('log-box');
-            box.innerHTML += text + "<br>";
-            box.scrollTop = box.scrollHeight;
-            // Перезаписываем историю чата в вечную локальную память девайса
-            localStorage.setItem('margo_chat_history', box.innerHTML);
-        }
-
-        function clearMemory() {
-            localStorage.clear();
-            window.location.reload();
-        }
+  try {
+    const response = await fetch('/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+    const data = await response.json();
+    termEl.innerHTML += <br>🤖 ${data.reply};
+  } catch (err) {
+    termEl.innerHTML += '<br><span style="color: #ff3333;">⚡️ Ошибка связи с ядром.</span>';
+  }
+  termEl.scrollTop = termEl.scrollHeight;
+}
     </script>
 </body>
 </html>
