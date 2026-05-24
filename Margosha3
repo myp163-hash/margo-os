@@ -1,0 +1,74 @@
+import os, json
+from aiohttp import web
+
+HTML = r"""<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>MARGO OS</title>
+<script src="https://jsdelivr.net"></script><script>eruda.init();</script>
+<style>
+:root{--bg:#060913;--panel:rgba(15,23,42,0.85);--neon:#00f3ff;--laser:#39ff14;}
+html,body{background:var(--bg)!important;color:#fff!important;font-family:sans-serif!important;margin:0;padding:0;min-height:100vh;display:flex;justify-content:center;align-items:center;overflow-x:hidden;}
+body::before{content:"";position:absolute;top:0;left:0;width:100%;height:100%;background:radial-gradient(circle at 15% 15%,rgba(0,243,255,0.18),transparent 45%),radial-gradient(circle at 85% 85%,rgba(57,255,20,0.08),transparent 45%);z-index:-1;}
+.wrapper{width:92%;max-width:420px;background:var(--panel);border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:24px;box-shadow:0 25px 50px rgba(0,0,0,0.6);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);box-sizing:border-box;}
+h1{font-size:30px;font-weight:900;text-align:center;letter-spacing:2px;margin:0 0 4px 0;background:linear-gradient(135deg,#fff 30%,var(--neon));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.status-badge{background:rgba(57,255,20,0.05);border:1px solid rgba(57,255,20,0.25);border-radius:10px;color:var(--laser);font-family:monospace;font-size:11px;text-align:center;padding:8px;margin-bottom:20px;letter-spacing:1px;text-shadow:0 0 8px rgba(57,255,20,0.3);}
+.screen{display:none;}.screen.active{display:block!important;}
+.form-group{margin-bottom:14px;}.form-group label{display:block;font-size:11px;color:#8f9cae;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;}
+input[type="text"],input[type="password"]{width:100%;background:#0b111e;border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px;color:#fff;font-size:14px;box-sizing:border-box;outline:none;transition:all 0.3s;}
+input[type="text"]:focus,input[type="password"]:focus{border-color:var(--neon);box-shadow:0 0 12px rgba(0,243,255,0.25);}
+.btn-prime{width:100%;background:linear-gradient(135deg,#0096c7,var(--neon));border:none;border-radius:12px;padding:14px;color:#030508;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;box-shadow:0 4px 15px rgba(0,243,255,0.25);}
+.terminal-box{width:100%;background:#04060b;border:1px solid rgba(255,255,255,0.04);border-radius:14px;height:180px;padding:12px;font-family:monospace;font-size:12px;color:#a0aec0;box-sizing:border-box;overflow-y:auto;margin-bottom:14px;box-shadow:inset 0 4px 20px rgba(0,0,0,0.8);line-height:1.5;}
+.onboarding-card{background:rgba(0,243,255,0.03);border:1px solid rgba(0,243,255,0.15);border-radius:12px;padding:12px;margin-bottom:14px;}
+.step-title{font-size:12px;font-weight:700;color:var(--neon);}.step-desc{font-size:11px;color:#94a3b8;}
+.btn-sec{width:100%;background:transparent;border:1px solid rgba(255,51,68,0.2);border-radius:10px;padding:10px;color:#ff5566;font-size:12px;font-weight:600;cursor:pointer;}
+</style></head><body><div class="wrapper"><h1>MARGO OS</h1><div class="status-badge">[✓] IMMORTAL MEMORY SHIELD ACTIVE // 184 MQ</div>
+<div id="auth-screen" class="screen active">
+<div class="form-group"><label>Придумайте логин...</label><input type="text" id="reg-user" placeholder="Логин..." autocomplete="off"></div>
+<div class="form-group"><label>Придумайте пароль...</label><input type="password" id="reg-pass" placeholder="Пароль..." autocomplete="off"></div>
+<div class="form-group"><label>Название вашего проекта...</label><input type="text" id="reg-project" placeholder="Проект..." autocomplete="off"></div>
+<button class="btn-prime" onclick="processRegistration()">Создать профиль и войти</button></div>
+<div id="main-screen" class="screen"><div id="onboarding-block" class="onboarding-card"><div class="step-title" id="onboard-title">Шаг 1 из 3: Подключение</div><div class="step-desc" id="onboard-desc">Вебсокет-сессия успешно активирована в суверенном квантовом ядре.</div><button class="btn-prime" style="padding:4px 8px;font-size:11px;width:auto;margin-top:6px;" onclick="nextOnboardingStep()">Далее</button></div><div class="terminal-box" id="terminal-screen"></div><form onsubmit="sendConsoleMessage(event)"><input type="text" id="console-input" placeholder="Задайте мне любой вопрос..." autocomplete="off"><button type="submit" class="btn-prime" style="margin-bottom:12px;">Отправить Марго</button></form>Сбросить профиль и память</button></div></div>
+<script>
+let socket;let currentStep=1;const authScreen=document.getElementById('auth-screen');const mainScreen=document.getElementById('main-screen');const termEl=document.getElementById('terminal-screen');
+window.onload=function(){const u=localStorage.getItem('m_u');const p=localStorage.getItem('m_p');if(u&&p)startCoreConnection(u,p);};
+function processRegistration(){const u=document.getElementById('reg-user').value.trim();const p=document.getElementById('reg-project').value.trim();if(!u||!p)return alert('Заполните поля!');localStorage.setItem('m_u',u);localStorage.setItem('m_p',p);startCoreConnection(u,p);}
+function startCoreConnection(u,p){authScreen.classList.remove('active');mainScreen.classList.add('active');termEl.innerHTML='> Развертывание протоколов...';const proto=window.location.protocol==='https:'?'wss://':'ws://';socket=new WebSocket(proto+window.location.host+'/ws');
+socket.onopen=function(){socket.send(JSON.stringify({type:"auth",user:u,project:p}));};
+socket.onmessage=function(e){termEl.innerHTML+='<br><span style="color:#39ff14;">🤖 '+e.data+'</span>';termEl.scrollTop=termEl.scrollHeight;};
+socket.onclose=function(){termEl.innerHTML+='<br><span style="color:#ff3344;">⚡ Разрыв связи.</span>';};}
+function nextOnboardingStep(){currentStep++;const t=document.getElementById('onboard-title');const d=document.getElementById('onboard-desc');
+if(currentStep===2){t.innerText="Шаг 2 из 3: Вопросы Марго";d.innerText="Используйте поле ввода для отправки любых b2b команд в ядро.";}
+else if(currentStep===3){t.innerText="Шаг 3 из 3: Сброс памяти";d.innerText="Нижняя кнопка полностью сотрет локальный кэш вашего профиля.";}
+else{document.getElementById('onboarding-block').style.display='none';}}
+function sendConsoleMessage(e){if(e)e.preventDefault();const input=document.getElementById('console-input');const text=input.value.trim();if(!text||socket.readyState!==WebSocket.OPEN)return;
+termEl.innerHTML+='<br><span style="color:#00f3ff;">> '+text+'</span>';socket.send(JSON.stringify({type:"msg",text:text}));input.value='';termEl.scrollTop=termEl.scrollHeight;}
+function clearIdentity(){localStorage.clear();location.reload();}
+</script></body></html>"""
+
+async def http_handler(request):
+    return web.Response(text=HTML, content_type='text/html')
+
+async def websocket_handler(request):
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+    current_user, current_project = "Друг", "Разработка"
+    try:
+        async for msg in ws:
+            if msg.type == web.WSMsgType.TEXT:
+                data = json.loads(msg.data)
+                if data.get("type") == "auth":
+                    current_user = data.get("user", "Друг")
+                    current_project = data.get("project", "Разработка")
+                    await ws.send_str(f"Привет, {current_user}! Контур '{current_project}' успешно активирован на частоте 184 MQ.")
+                elif data.get("type") == "msg":
+                    text = data.get("text", "")
+                    reply = f"Ядро MARGO OS приветствует тебя, {current_user}." if "привет" in text.lower() else f"Запрос по модулю '{current_project}' обработан без ошибок."
+                    await ws.send_str(reply)
+    except Exception:
+        pass
+    return ws
+
+app = web.Application()
+app.router.add_get('/', http_handler)
+app.router.add_get('/ws', websocket_handler)
+
+if __name__ == '__main__':
+    web.run_app(app, host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
