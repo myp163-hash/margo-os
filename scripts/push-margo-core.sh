@@ -12,7 +12,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REMOTE="${REMOTE:-https://github.com/myp163-hash/margo-core.git}"
 BRANCH="${BRANCH:-main}"
 SNAP="${SNAP_GIT:-$HOME/.margo_core_snapshot.git}"
-MAX_MB="${MAX_MB:-50}"
+MAX_MB="${MAX_MB:-20}"
+LIMIT_TOTAL_MB="${LIMIT_TOTAL_MB:-400}"   # больше — не отправляю, показываю, что тяжёлое
 
 MARGO_DIR="$(bash "$ROOT/scripts/find-margo-dir.sh")"
 echo "Ядро: $MARGO_DIR"
@@ -62,7 +63,30 @@ __pycache__/
 models/
 .DS_Store
 margo.pid
+# архивы, распаковки, переписка и база знаний — для разбора кода не нужны
+/Марго/UNPACKED/
+/_НАХОДКИ_АРХИВЫ/
+/Знания/
+/Синхро/
+*.zip
+*.tar
+*.tgz
+*.gz
+*.7z
+*.rar
+*.dmg
+*.pkg
+*.ipa
+*.iso
+*.mp4
+*.mov
+*.m4a
+*.mp3
+*.wav
+*.ogg
+*.heic
 EOF
+for d in ${EXTRA_EXCLUDE:-}; do echo "/$d/" >> "$SNAP/info/exclude"; done
 
 G() { git -c core.quotePath=false --git-dir="$SNAP" --work-tree="$MARGO_DIR" "$@"; }
 
@@ -97,19 +121,31 @@ tree="$(G write-tree)"
 count="$(G ls-tree -r "$tree" | wc -l | tr -d ' ')"
 size="$(G ls-tree -r -l "$tree" | awk '{s+=$4} END {printf "%.1f", s/1048576}')"
 echo "В снимке: $count файлов, ${size} МБ"
-
-parent="$(G rev-parse -q --verify "refs/heads/$BRANCH" || true)"
-if [ -n "$parent" ] && [ "$(G rev-parse "$parent^{tree}")" = "$tree" ]; then
-  echo "Изменений нет с прошлого снимка."
-else
-  name="$(git config --global user.name || echo 'Mac Margo')"
-  mail="$(git config --global user.email || echo 'mac-margo@localhost')"
-  commit="$(GIT_AUTHOR_NAME="$name" GIT_AUTHOR_EMAIL="$mail" \
-            GIT_COMMITTER_NAME="$name" GIT_COMMITTER_EMAIL="$mail" \
-            G commit-tree "$tree" ${parent:+-p "$parent"} -m "снимок MARGO_CORE $(date '+%Y-%m-%d %H:%M')")"
-  G update-ref "refs/heads/$BRANCH" "$commit"
+mb="$(G ls-tree -r -l "$tree" | awk '{s+=$4} END {printf "%d", s/1048576}')"
+if [ "$mb" -gt "$LIMIT_TOTAL_MB" ]; then
+  echo "Слишком много (${mb} МБ > ${LIMIT_TOTAL_MB} МБ). Самые тяжёлые папки:"
+  G ls-tree -r -l "$tree" | awk -F '\t' '{ split($1,m," "); n=split($2,p,"/"); k=(n>2 ? p[1]"/"p[2] : p[1]); s[k]+=m[4] }
+    END { for (k in s) printf "%8.1f МБ  %s\n", s[k]/1048576, k }' | sort -rn | head -15
+  echo "Исключить папки:  EXTRA_EXCLUDE='папка1 папка2/подпапка' $0"
+  echo "Или отправить всё: LIMIT_TOTAL_MB=2000 $0"
+  exit 1
 fi
 
+# Родитель — только то, что реально дошло до GitHub (refs/pushed/*): неотправленный
+# снимок от прерванного запуска в историю не попадёт и не потянется следом.
+parent="$(G rev-parse -q --verify "refs/pushed/$BRANCH" || true)"
+if [ -n "$parent" ] && [ "$(G rev-parse "$parent^{tree}")" = "$tree" ]; then
+  echo "Изменений нет с прошлой отправки. Готово."
+  exit 0
+fi
+name="$(git config --global user.name || echo 'Mac Margo')"
+mail="$(git config --global user.email || echo 'mac-margo@localhost')"
+commit="$(GIT_AUTHOR_NAME="$name" GIT_AUTHOR_EMAIL="$mail" \
+          GIT_COMMITTER_NAME="$name" GIT_COMMITTER_EMAIL="$mail" \
+          G commit-tree "$tree" ${parent:+-p "$parent"} -m "снимок MARGO_CORE $(date '+%Y-%m-%d %H:%M')")"
+G update-ref "refs/heads/$BRANCH" "$commit"
+
 echo "=== отправляю в $REMOTE ==="
-G push "$REMOTE" "refs/heads/$BRANCH:refs/heads/$BRANCH"
+G push "$REMOTE" "+refs/heads/$BRANCH:refs/heads/$BRANCH"
+G update-ref "refs/pushed/$BRANCH" "$commit"
 echo "Готово."
