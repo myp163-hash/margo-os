@@ -21,27 +21,8 @@ if [[ "${1:-}" == "uninstall" ]]; then
   exit 0
 fi
 
-if [[ ! -f "$MARGO_DIR/matrix.py" ]]; then
-  # Ищем ядро сами: папка, где рядом лежат matrix.py и tools/перезапуск.sh или margo_v1.db
-  found=""
-  while IFS= read -r f; do
-    d="$(dirname "$f")"
-    case "$d" in */Library/*|*/.Trash/*|*/backups/*|*/patches/*) continue ;; esac
-    if [[ -f "$d/tools/перезапуск.sh" || -f "$d/margo_v1.db" ]]; then
-      found="${found}${d}"$'\n'
-    fi
-  done < <(mdfind "kMDItemFSName == 'matrix.py'" 2>/dev/null)
-  found="$(printf '%s' "$found" | sort -u | sed '/^$/d')"
-  if [[ -n "$found" && "$(printf '%s\n' "$found" | wc -l | tr -d ' ')" == "1" ]]; then
-    MARGO_DIR="$found"
-    echo "Нашла ядро Марго: $MARGO_DIR"
-  else
-    echo "Не нашла папку с matrix.py автоматически."
-    [[ -n "$found" ]] && { echo "Кандидаты:"; printf '%s\n' "$found" | sed 's/^/  /'; }
-    echo "Укажи путь явно:  MARGO_DIR=/путь/к/MARGO_CORE $0"
-    exit 1
-  fi
-fi
+MARGO_DIR="$(MARGO_DIR="$MARGO_DIR" bash "$ROOT/scripts/find-margo-dir.sh")"
+echo "Ядро Марго: $MARGO_DIR"
 command -v git >/dev/null || { echo "git не найден"; exit 1; }
 command -v python3 >/dev/null || { echo "python3 не найден"; exit 1; }
 
