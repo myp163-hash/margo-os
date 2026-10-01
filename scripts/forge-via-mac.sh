@@ -2,7 +2,7 @@
 # Хелпер: дернуть Кузницу с Mac (модели / generate smoke).
 set -euo pipefail
 
-FORGE="${FORGE_URL:-http://192.168.31.107:11434}"
+FORGE="${FORGE_URL:-http://192.168.1.20:11434}"
 MODEL="${MODEL:-qwen2.5-coder}"
 
 case "${1:-tags}" in
