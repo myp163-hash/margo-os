@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Облачный почтовый ящик Марго.
-# Claude из облака кладёт файлы в папку drop/ репозитория на GitHub,
+# Claude из облака кладёт файлы в папку drop/ приватного репозитория margo-core,
 # этот скрипт (launchd, раз в минуту) забирает их на Mac и раскладывает:
 #   drop/core/<путь>      → $MARGO_DIR/<путь>      (MARGO_CORE)
 #   drop/incoming/<путь>  → $INCOMING_DIR/<путь>   (~/margo_incoming)
@@ -17,7 +17,7 @@
 # Работает на bash 3.2 (штатный bash macOS).
 set -uo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/myp163-hash/margo-os.git}"
+REPO_URL="${REPO_URL:-https://github.com/myp163-hash/margo-core.git}"   # приватный
 MAIN_BRANCH="${MAIN_BRANCH:-main}"
 DROP_PREFIXES="${DROP_PREFIXES:-claude}"          # ветки облачных сессий: claude/*
 STATUS_BRANCH="${STATUS_BRANCH:-cloud-drop-status}"
