@@ -87,6 +87,48 @@ is_core() {
 APPLIED="$TMP/applied"; SKIPPED="$TMP/skipped"
 : > "$APPLIED"; : > "$SKIPPED"
 NEED_RESTART=0
+RUNS="$STATE/runs"; mkdir -p "$RUNS"
+RUN_TIMEOUT="${RUN_TIMEOUT:-300}"
+
+# В выводе команд прячем значения ключей: отчёт уходит на GitHub.
+mask() {
+  sed -E \
+    -e 's/((TOKEN|KEY|SECRET|PASS|PASSWORD|HASH|SESSION)[A-Za-z0-9_]*[[:space:]]*[=:][[:space:]]*["'"'"']?)[^"'"'"'[:space:]]{4,}/\1***/g' \
+    -e 's/(sk-|AIza|ghp_|github_pat_|hf_|xox[baprs]-|y0_|AQVN|eyJ)[A-Za-z0-9_.-]{8,}/\1***/g' \
+    -e 's/[0-9]{8,10}:AA[A-Za-z0-9_-]{20,}/<tg-token>/g'
+}
+
+run_one() {
+  # drop/run/<имя>.sh — выполнить один раз в MARGO_DIR, вывод → отчёт
+  local sha="$1" src="$2" ref="$3" rel="$4" f out name rc
+  case "$rel" in *.sh) ;; *) echo "$src — в run/ только .sh" >> "$SKIPPED"; return 0 ;; esac
+  f="$TMP/run.sh"
+  g cat-file blob "$sha:$src" > "$f" 2>/dev/null || { echo "$src — не прочитал" >> "$SKIPPED"; return 0; }
+  if ! bash -n "$f" 2>"$TMP/syntax.err"; then
+    echo "$src — синтаксическая ошибка: $(tail -n 1 "$TMP/syntax.err")" >> "$SKIPPED"; return 0
+  fi
+  name="$(date +%Y%m%d-%H%M%S)-$(basename "$rel" .sh | tr -d '\n' | tr -c 'A-Za-z0-9_.-' '_')"
+  out="$RUNS/$name.log"
+  log "выполняю $src ← $ref"
+  (cd "$MARGO_DIR" && perl -e 'alarm shift; exec @ARGV' "$RUN_TIMEOUT" bash "$f") > "$TMP/run.out" 2>&1
+  rc=$?
+  [ "$rc" = 142 ] && echo "⏱ таймаут ${RUN_TIMEOUT}с — процесс снят" >> "$TMP/run.out"
+  { echo "# $src ($ref @ ${sha:0:7}) — код выхода $rc"; echo; head -n 500 "$TMP/run.out" | mask; } > "$out"
+  echo "run/$rel → код $rc, вывод в run-$name.log" >> "$APPLIED"
+}
+
+# Названия ключей из .env (без значений) — что вообще настроено.
+env_names() {
+  local f
+  for f in "$HOME/.config/margo/.env" "$MARGO_DIR/.env"; do
+    [ -f "$f" ] || continue
+    echo "### $f"
+    grep -E '^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*=' "$f" \
+      | sed -E 's/^[[:space:]]*(export[[:space:]]+)?//' \
+      | awk -F= '{ v=substr($0, index($0,"=")+1); gsub(/^["'"'"' ]+|["'"'"' ]+$/,"",v);
+                   printf "- %s: %s\n", $1, ($1 ~ /^OFF_/ ? "выключен (OFF_)" : (v=="" ? "ПУСТО" : "задан")) }'
+  done
+}
 
 apply_one() {
   # $1 = коммит, $2 = путь в репозитории (drop/<корень>/<путь>), $3 = ветка
@@ -95,6 +137,7 @@ apply_one() {
   root="${rest%%/*}"
   rel="${rest#*/}"
   [ "$rel" = "$rest" ] && return 0            # drop/README.md и т.п. — служебное
+  if [ "$root" = run ]; then run_one "$sha" "$src" "$ref" "$rel"; return 0; fi
   case "$root" in
     core)     base="$MARGO_DIR" ;;
     incoming) base="$INCOMING_DIR" ;;
@@ -221,10 +264,20 @@ fi
     echo "health-lan.sh не найден рядом со скриптом"
   fi
   echo '```'
+  echo
+  echo "## Ключи в .env (только названия)"
+  env_names
 } > "$TMP/status.md"
 
-blob="$(g hash-object -w "$TMP/status.md")" &&
-tree="$(printf '100644 blob %s\tstatus.md\n' "$blob" | g mktree)" &&
+# В отчёт: status.md + последние 20 логов команд из drop/run/
+{
+  printf '100644 blob %s\tstatus.md\n' "$(g hash-object -w "$TMP/status.md")"
+  ls -1t "$RUNS" 2>/dev/null | head -n 20 | while IFS= read -r l; do
+    printf '100644 blob %s\trun-%s\n' "$(g hash-object -w "$RUNS/$l")" "$l"
+  done
+} > "$TMP/tree.txt"
+
+tree="$(g mktree < "$TMP/tree.txt")" &&
 commit="$(GIT_AUTHOR_NAME="Mac Margo" GIT_AUTHOR_EMAIL="mac-margo@localhost" \
           GIT_COMMITTER_NAME="Mac Margo" GIT_COMMITTER_EMAIL="mac-margo@localhost" \
           g commit-tree "$tree" -m "status $TS")" &&
