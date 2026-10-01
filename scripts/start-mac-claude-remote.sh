@@ -7,7 +7,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 MARGO_DIR="${MARGO_DIR:-$HOME/MARGO_CORE}"
-FORGE_HOST="${FORGE_HOST:-192.168.31.107}"
+FORGE_HOST="${FORGE_HOST:-192.168.1.20}"
 FORGE_PORT="${FORGE_PORT:-11434}"
 
 if ! command -v claude >/dev/null 2>&1; then

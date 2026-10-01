@@ -2,7 +2,7 @@
 # Проверка Mac Марго + Кузница (Forge) из локалки.
 set -euo pipefail
 
-FORGE_HOST="${FORGE_HOST:-192.168.31.107}"
+FORGE_HOST="${FORGE_HOST:-192.168.1.20}"
 FORGE_PORT="${FORGE_PORT:-11434}"
 MATRIX_HOST="${MATRIX_HOST:-127.0.0.1}"
 MATRIX_PORT="${MATRIX_PORT:-2026}"

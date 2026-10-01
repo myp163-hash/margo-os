@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Запуск Cursor My Machines worker на Mac Марго.
 # С планшета: новый Agent → environment = mac-margo.
-# Кузница доступна с Mac по LAN (192.168.31.107:11434).
+# Кузница доступна с Mac по LAN (192.168.1.20:11434).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 WORKER_NAME="${WORKER_NAME:-mac-margo}"
-FORGE_HOST="${FORGE_HOST:-192.168.31.107}"
+FORGE_HOST="${FORGE_HOST:-192.168.1.20}"
 FORGE_PORT="${FORGE_PORT:-11434}"
 
 if ! command -v agent >/dev/null 2>&1; then
