@@ -110,7 +110,7 @@ if [ -n "$big" ]; then
 fi
 
 # похожее на токены — файл целиком не уходит
-PAT='-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-(ant-|or-|proj-)?[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{20,}|[0-9]{8,10}:AA[A-Za-z0-9_-]{33}|hf_[A-Za-z0-9]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}'
+PAT='-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-(ant-|or-|proj-)?[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{20,}|[0-9]{8,10}:AA[A-Za-z0-9_-]{33}|hf_[A-Za-z0-9]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}|y0_[A-Za-z0-9_-]{30,}|AQVN[A-Za-z0-9_-]{30,}|t1\.[A-Za-z0-9_-]{40,}'
 secret="$(G grep --cached -l -I -E -e "$PAT" || true)"
 if [ -n "$secret" ]; then
   echo "Найден текст, похожий на ключ/токен (файлы НЕ перенесены):"; echo "$secret" | sed 's/^/  /'
@@ -134,6 +134,8 @@ fi
 # Родитель — только то, что реально дошло до GitHub (refs/pushed/*): неотправленный
 # снимок от прерванного запуска в историю не попадёт и не потянется следом.
 parent="$(G rev-parse -q --verify "refs/pushed/$BRANCH" || true)"
+# RESET_HISTORY=1 — начать историю заново (если в прошлый снимок попало лишнее)
+[ "${RESET_HISTORY:-0}" = 1 ] && parent=""
 if [ -n "$parent" ] && [ "$(G rev-parse "$parent^{tree}")" = "$tree" ]; then
   echo "Изменений нет с прошлой отправки. Готово."
   exit 0
