@@ -18,7 +18,16 @@ ssh "$FORGE" 'command -v rclone >/dev/null || sudo -n apt-get install -y rclone 
   || { echo "Не смог поставить rclone на Кузнице без пароля sudo: ssh $FORGE, затем sudo apt-get install -y rclone, и запусти скрипт снова."; exit 1; }
 
 echo "== передаю доступ на Кузницу"
-printf '%s' "$TOKEN" | ssh "$FORGE" 'T=$(cat); rclone config delete yadisk >/dev/null 2>&1; rclone config create yadisk yandex token "$T" >/dev/null'
+# Пишем конфиг напрямую: «rclone config create» на Кузнице снова запускал вход в браузере и висел
+printf '%s' "$TOKEN" | ssh "$FORGE" 'T=$(cat); C=$(rclone config file | tail -1); mkdir -p "$(dirname "$C")"; touch "$C"; chmod 600 "$C";
+  python3 - "$C" "$T" <<PY2
+import sys, configparser
+p, t = sys.argv[1], sys.argv[2]
+c = configparser.RawConfigParser(); c.read(p)
+if c.has_section("yadisk"): c.remove_section("yadisk")
+c.add_section("yadisk"); c.set("yadisk", "type", "yandex"); c.set("yadisk", "token", t)
+with open(p, "w") as f: c.write(f)
+PY2'
 unset TOKEN OUT
 
 echo "== проверка"
